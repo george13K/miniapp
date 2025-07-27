@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Финансовый трекер</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #6e45e2, #88d3ce);
+            background-size: 200% 200%;
+            animation: gradientShift 15s ease infinite;
+            color: #333;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        h1 {
+            font-size: 30px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 24px;
+            color: #fff;
+            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 1s ease-in;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .form-container, .stats-container, .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+            margin-bottom: 20px;
+            animation: slideUp 0.6s ease-out;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        input, select {
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            background: #f0f2f5;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        input:focus, select:focus {
+            box-shadow: 0 0 0 3px rgba(110, 69, 226, 0.3);
+            transform: scale(1.02);
+        }
+        button {
+            padding: 14px;
+            background: linear-gradient(90deg, #6e45e2, #88d3ce);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+        .filter-container {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        #transactions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .transaction {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.4s ease-out;
+            transition: transform 0.3s;
+        }
+        .transaction:hover {
+            transform: translateY(-2px);
+        }
+        .transaction span {
+            color: #6e45e2;
+            font-weight: 600;
+        }
+        .transaction button {
+            background: #ff6b6b;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            text-align: center;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            animation: slideUp 0.6s ease-out;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease-in;
+        }
+        .modal-content {
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            animation: slideUp 0.4s ease-out;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideIn {
+            from { transform: translateX(-30px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #2b5876, #4e4376);
+            }
+            h1 {
+                color: #fff;
+            }
+            .form-container, .stats-container, .chart-container, .transaction, .modal-content {
+                background: rgba(42, 52, 57, 0.95);
+                color: #e0e0e0;
+            }
+            input, select {
+                background: #3a4449;
+                color: #e0e0e0;
+            }
+            input:focus, select:focus {
+                box-shadow: 0 0 0 3px rgba(77, 168, 218, 0.3);
+            }
+            button {
+                background: linear-gradient(90deg, #4da8da, #7f53ac);
+            }
+            .transaction span {
+                color: #4da8da;
+            }
+            .transaction button {
+                background: #ff8787;
+            }
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+            .form-container, .stats-container, .chart-container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Финансовый трекер</h1>
+        <div class="form-container">
+            <div class="input-group">
+                <input id="amount" type="number" placeholder="Сумма" step="0.01">
+                <select id="category"></select>
+                <select id="type">
+                    <option value="доход">Доход</option>
+                    <option value="расход">Расход</option>
+                </select>
+                <input id="date" type="date" value="">
+                <button onclick="addTransaction()">Добавить транзакцию</button>
+            </div>
+            <div class="input-group" style="margin-top: 12px;">
+                <input id="budget" type="number" placeholder="Месячный бюджет" step="0.01">
+                <button onclick="setBudget()">Установить бюджет</button>
+            </div>
+        </div>
+        <div class="stats-container">
+            <div class="stat-card">
+                <h3>Доходы</h3>
+                <p id="total-income">0 руб.</p>
+            </div>
+            <div class="stat-card">
+                <h3>Расходы</h3>
+                <p id="total-expense">0 руб.</p>
+            </div>
+            <div class="stat-card">
+                <h3>Баланс</h3>
+                <p id="balance">0 руб.</p>
+            </div>
+            <div class="stat-card">
+                <h3>Бюджет</h3>
+                <p id="budget-progress">0 / 0 руб.</p>
+            </div>
+        </div>
+        <div class="filter-container">
+            <select id="filter-type" onchange="applyFilters()">
+                <option value="">Все типы</option>
+                <option value="доход">Доход</option>
+                <option value="расход">Расход</option>
+            </select>
+            <select id="filter-category" onchange="applyFilters()">
+                <option value="">Все категории</option>
+            </select>
+            <select id="filter-period" onchange="applyFilters()">
+                <option value="all">Все время</option>
+                <option value="day">Сегодня</option>
+                <option value="week">Неделя</option>
+                <option value="month">Месяц</option>
+            </select>
+            <button onclick="exportCSV()">Экспорт в CSV</button>
+        </div>
+        <div id="transactions"></div>
+        <div class="chart-container">
+            <canvas id="financeChart"></canvas>
+        </div>
+    </div>
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h2>Редактировать транзакцию</h2>
+            <div class="input-group">
+                <input id="edit-amount" type="number" placeholder="Сумма" step="0.01">
+                <select id="edit-category"></select>
+                <select id="edit-type">
+                    <option value="доход">Доход</option>
+                    <option value="расход">Расход</option>
+                </select>
+                <input id="edit-date" type="date">
+                <button onclick="saveEdit()">Сохранить</button>
+                <button onclick="closeModal()">Отмена</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        let chart;
+        let editId = null;
+
+        async function addTransaction() {
+            const amount = document.getElementById('amount').value;
+            const category = document.getElementById('category').value;
+            const type = document.getElementById('type').value;
+            const date = document.getElementById('date').value || new Date().toISOString().split('T')[0];
+            if (!amount || !category) {
+                tg.showAlert('Заполните сумму и категорию!');
+                return;
+            }
+            const response = await fetch('https://my-finance-api.herokuapp.com/api/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: tg.initDataUnsafe.user.id,
+                    amount: parseFloat(amount),
+                    category,
+                    type,
+                    date
+                })
+            });
+            if (response.ok) {
+                tg.showAlert('Транзакция добавлена!');
+                document.getElementById('amount').value = '';
+                document.getElementById('category').value = '';
+                document.getElementById('date').value = '';
+                loadData();
+            }
+        }
+
+        async function editTransaction(id) {
+            const response = await fetch(`https://my-finance-api.herokuapp.com/api/transactions?user_id=${tg.initDataUnsafe.user.id}`);
+            const transactions = await response.json();
+            const transaction = transactions.find(t => t.id === id);
+            editId = id;
+            document.getElementById('edit-amount').value = transaction.amount;
+            document.getElementById('edit-category').value = transaction.category;
+            document.getElementById('edit-type').value = transaction.type;
+            document.getElementById('edit-date').value = transaction.date;
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        async function saveEdit() {
+            const amount = document.getElementById('edit-amount').value;
+            const category = document.getElementById('edit-category').value;
+            const type = document.getElementById('edit-type').value;
+            const date = document.getElementById('edit-date').value;
+            if (!amount || !category) {
+                tg.showAlert('Заполните сумму и категорию!');
+                return;
+            }
+            const response = await fetch('https://my-finance-api.herokuapp.com/api/edit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: editId,
+                    user_id: tg.initDataUnsafe.user.id,
+                    amount: parseFloat(amount),
+                    category,
+                    type,
+                    date
+                })
+            });
+            if (response.ok) {
+                tg.showAlert('Транзакция обновлена!');
+                closeModal();
+                loadData();
+            }
+        }
+
+        async function deleteTransaction(id) {
+            const response = await fetch('https://my-finance-api.herokuapp.com/api/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: tg.initDataUnsafe.user.id,
+                    id
+                })
+            });
+            if (response.ok) {
+                tg.showAlert('Транзакция удалена!');
+                loadData();
+            }
+        }
+
+        async function setBudget() {
+            const amount = document.getElementById('budget').value;
+            if (!amount) {
+                tg.showAlert('Введите сумму бюджета!');
+                return;
+            }
+            const response = await fetch('https://my-finance-api.herokuapp.com/api/budget', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: tg.initDataUnsafe.user.id,
+                    amount: parseFloat(amount)
+                })
+            });
+            if (response.ok) {
+                tg.showAlert('Бюджет установлен!');
+                document.getElementById('budget').value = '';
+                loadData();
+            }
+        }
+
+        async function loadCategories() {
+            const response = await fetch(`https://my-finance-api.herokuapp.com/api/categories?user_id=${tg.initDataUnsafe.user.id}`);
+            const categories = await response.json();
+            const selects = [document.getElementById('category'), document.getElementById('edit-category'), document.getElementById('filter-category')];
+            selects.forEach(select => {
+                if (select.id === 'filter-category') {
+                    select.innerHTML = '<option value="">Все категории</option>';
+                } else {
+                    select.innerHTML = '';
+                }
+                categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    select.appendChild(option);
+                });
+            });
+        }
+
+        async function loadTransactions() {
+            const response = await fetch(`https://my-finance-api.herokuapp.com/api/transactions?user_id=${tg.initDataUnsafe.user.id}`);
+            const transactions = await response.json();
+            const filterType = document.getElementById('filter-type').value;
+            const filterCategory = document.getElementById('filter-category').value;
+            const filterPeriod = document.getElementById('filter-period').value;
+            const now = new Date();
+            const filteredTransactions = transactions.filter(t => {
+                const tDate = new Date(t.date);
+                if (filterType && t.type !== filterType) return false;
+                if (filterCategory && t.category !== filterCategory) return false;
+                if (filterPeriod === 'day') return tDate.toDateString() === now.toDateString();
+                if (filterPeriod === 'week') return (now - tDate) / (1000 * 60 * 60 * 24) <= 7;
+                if (filterPeriod === 'month') return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+                return true;
+            });
+            const container = document.getElementById('transactions');
+            container.innerHTML = '';
+            filteredTransactions.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'transaction';
+                div.innerHTML = `
+                    <span>${t.date}</span>: ${t.amount} руб. (${t.category}, ${t.type})
+                    <div>
+                        <button onclick="editTransaction(${t.id})">Редактировать</button>
+                        <button onclick="deleteTransaction(${t.id})">Удалить</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            return filteredTransactions;
+        }
+
+        async function loadStats() {
+            const transactions = await loadTransactions();
+            const budgetResponse = await fetch(`https://my-finance-api.herokuapp.com/api/budget?user_id=${tg.initDataUnsafe.user.id}`);
+            const budget = await budgetResponse.json();
+            const income = transactions.filter(t => t.type === 'доход').reduce((sum, t) => sum + t.amount, 0);
+            const expense = transactions.filter(t => t.type === 'расход').reduce((sum, t) => sum + t.amount, 0);
+            document.getElementById('total-income').textContent = `${income.toFixed(2)} руб.`;
+            document.getElementById('total-expense').textContent = `${expense.toFixed(2)} руб.`;
+            document.getElementById('balance').textContent = `${(income - expense).toFixed(2)} руб.`;
+            document.getElementById('budget-progress').textContent = `${expense.toFixed(2)} / ${budget.amount.toFixed(2)} руб.`;
+            updateChart(transactions);
+        }
+
+        function updateChart(transactions) {
+            const categories = [...new Set(transactions.map(t => t.category))];
+            const datasets = [
+                {
+                    label: 'Доходы',
+                    data: categories.map(cat => transactions.filter(t => t.category === cat && t.type === 'доход').reduce((sum, t) => sum + t.amount, 0)),
+                    backgroundColor: ['#6e45e2', '#88d3ce', '#ff6b6b', '#4da8da', '#f4a261', '#2a9d8f'],
+                },
+                {
+                    label: 'Расходы',
+                    data: categories.map(cat => transactions.filter(t => t.category === cat && t.type === 'расход').reduce((sum, t) => sum + t.amount, 0)),
+                    backgroundColor: ['#6e45e2', '#88d3ce', '#ff6b6b', '#4da8da', '#f4a261', '#2a9d8f'].map(c => c + '80'),
+                }
+            ];
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('financeChart'), {
+                type: 'pie',
+                data: {
+                    labels: categories,
+                    datasets
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(2)} руб.`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function exportCSV() {
+            const response = await fetch(`https://my-finance-api.herokuapp.com/api/export?user_id=${tg.initDataUnsafe.user.id}`);
+            const data = await response.json();
+            const blob = new Blob([data.csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'transactions.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        function applyFilters() {
+            loadStats();
+        }
+
+        async function loadData() {
+            await loadCategories();
+            await loadStats();
+        }
+
+        window.onload = () => {
+            document.getElementById('date').value = new Date().toISOString().split('T')[0];
+            loadData();
+        };
+    </script>
+</body>
+</html>

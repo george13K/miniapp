@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Финансовый трекер</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #74ebd5, #acb6e5);
+            color: #333;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 24px;
+            color: #fff;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 1s ease-in;
+        }
+        .form-container {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            animation: slideUp 0.5s ease-out;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        input, select {
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s, transform 0.2s;
+        }
+        input:focus, select:focus {
+            border-color: #74ebd5;
+            transform: scale(1.02);
+        }
+        button {
+            padding: 12px;
+            background: linear-gradient(90deg, #74ebd5, #acb6e5);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        #transactions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .transaction {
+            background: #ffffff;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            animation: slideIn 0.3s ease-out;
+        }
+        .transaction span {
+            color: #74ebd5;
+            font-weight: 500;
+        }
+        .transaction button {
+            background: #ff6b6b;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        .filter-container {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        #chart-container {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+            animation: slideUp 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #2b5876, #4e4376);
+                color: #e0e0e0;
+            }
+            h1 {
+                color: #ffffff;
+            }
+            .form-container, .transaction, #chart-container {
+                background: #2a3439;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            }
+            input, select {
+                background: #3a4449;
+                border-color: #4a555a;
+                color: #e0e0e0;
+            }
+            input:focus, select:focus {
+                border-color: #4da8da;
+            }
+            button {
+                background: linear-gradient(90deg, #4da8da, #7f53ac);
+            }
+            .transaction span {
+                color: #4da8da;
+            }
+        }
+        @media (max-width: 600px) {
+            .form-container, #chart-container {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Финансовый трекер</h1>
+    <div class="form-container">
+        <div class="input-group">
+            <input id="amount" type="number" placeholder="Сумма" step="0.01">
+            <input id="category" type="text" placeholder="Категория">
+            <select id="type">
+                <option value="доход">Доход</option>
+                <option value="расход">Расход</option>
+            </select>
+            <button onclick="addTransaction()">Добавить транзакцию</button>
+        </div>
+    </div>
+    <div class="filter-container">
+        <select id="filter-type" onchange="applyFilters()">
+            <option value="">Все типы</option>
+            <option value="доход">Доход</option>
+            <option value="расход">Расход</option>
+        </select>
+        <select id="filter-category" onchange="applyFilters()">
+            <option value="">Все категории</option>
+        </select>
+    </div>
+    <div id="transactions"></div>
+    <div id="chart-container">
+        <canvas id="financeChart"></canvas>
+    </div>
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        let chart;
+
+        async function addTransaction() {
+            const amount = document.getElementById('amount').value;
+            const category = document.getElementById('category').value;
+            const type = document.getElementById('type').value;
+            if (!amount || !category) {
+                tg.showAlert('Заполните все поля!');
+                return;
+            }
+            const response = await fetch('https://my-finance-api.herokuapp.com/api/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: tg.initDataUnsafe.user.id,
+                    amount: parseFloat(amount),
+                    category,
+                    type
+                })
+            });
+            if (response.ok) {
+                tg.showAlert('Транзакция добавлена!');
+                document.getElementById('amount').value = '';
+                document.getElementById('category').value = '';
+                loadTransactions();
+                loadCategories();
+            }
+        }
+
+        async function deleteTransaction(id) {
+            const response = await fetch('https://my-finance-api.herokuapp.com/api/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: tg.initDataUnsafe.user.id,
+                    id
+                })
+            });
+            if (response.ok) {
+                tg.showAlert('Транзакция удалена!');
+                loadTransactions();
+                loadCategories();
+            }
+        }
+
+        async function loadCategories() {
+            const response = await fetch(`https://my-finance-api.herokuapp.com/api/categories?user_id=${tg.initDataUnsafe.user.id}`);
+            const categories = await response.json();
+            const select = document.getElementById('filter-category');
+            select.innerHTML = '<option value="">Все категории</option>';
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadTransactions() {
+            const response = await fetch(`https://my-finance-api.herokuapp.com/api/transactions?user_id=${tg.initDataUnsafe.user.id}`);
+            const transactions = await response.json();
+            const filterType = document.getElementById('filter-type').value;
+            const filterCategory = document.getElementById('filter-category').value;
+            const filteredTransactions = transactions.filter(t =>
+                (!filterType || t.type === filterType) &&
+                (!filterCategory || t.category === filterCategory)
+            );
+            const container = document.getElementById('transactions');
+            container.innerHTML = '';
+            filteredTransactions.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'transaction';
+                div.innerHTML = `
+                    <span>${t.date}</span>: ${t.amount} руб. (${t.category}, ${t.type})
+                    <button onclick="deleteTransaction(${t.id})">Удалить</button>
+                `;
+                container.appendChild(div);
+            });
+            updateChart(filteredTransactions);
+        }
+
+        function updateChart(transactions) {
+            const categories = [...new Set(transactions.map(t => t.category))];
+            const incomeData = categories.map(cat =>
+                transactions
+                    .filter(t => t.category === cat && t.type === 'доход')
+                    .reduce((sum, t) => sum + t.amount, 0)
+            );
+            const expenseData = categories.map(cat =>
+                transactions
+                    .filter(t => t.category === cat && t.type === 'расход')
+                    .reduce((sum, t) => sum + t.amount, 0)
+            );
+
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('financeChart'), {
+                type: 'bar',
+                data: {
+                    labels: categories,
+                    datasets: [
+                        {
+                            label: 'Доходы',
+                            data: incomeData,
+                            backgroundColor: 'rgba(116, 235, 213, 0.7)',
+                            borderColor: 'rgba(116, 235, 213, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Расходы',
+                            data: expenseData,
+                            backgroundColor: 'rgba(172, 182, 229, 0.7)',
+                            borderColor: 'rgba(172, 182, 229, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { position: 'top' }
+                    }
+                }
+            });
+        }
+
+        function applyFilters() {
+            loadTransactions();
+        }
+
+        window.onload = () => {
+            loadTransactions();
+            loadCategories();
+        };
+    </script>
+</body>
+</html>
